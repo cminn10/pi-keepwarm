@@ -1,5 +1,11 @@
 # pi-keepwarm
 
+[![npm version](https://img.shields.io/npm/v/pi-keepwarm?logo=npm)](https://www.npmjs.com/package/pi-keepwarm)
+[![npm downloads](https://img.shields.io/npm/dm/pi-keepwarm)](https://www.npmjs.com/package/pi-keepwarm)
+[![Release](https://github.com/cminn10/pi-keepwarm/actions/workflows/release.yml/badge.svg)](https://github.com/cminn10/pi-keepwarm/actions/workflows/release.yml)
+[![pi package](https://img.shields.io/badge/pi-package-7c3aed)](https://pi.dev/packages/pi-keepwarm)
+[![license](https://img.shields.io/npm/l/pi-keepwarm)](LICENSE)
+
 English | [中文](README.zh-CN.md)
 
 A [pi](https://pi.dev) extension that keeps a long session's prompt cache warm **while you're idle**, so the first message after a 20–60 minute break reads the cache instead of paying for a full cache rewrite.

@@ -1,5 +1,11 @@
 # pi-keepwarm
 
+[![npm version](https://img.shields.io/npm/v/pi-keepwarm?logo=npm)](https://www.npmjs.com/package/pi-keepwarm)
+[![npm downloads](https://img.shields.io/npm/dm/pi-keepwarm)](https://www.npmjs.com/package/pi-keepwarm)
+[![Release](https://github.com/cminn10/pi-keepwarm/actions/workflows/release.yml/badge.svg)](https://github.com/cminn10/pi-keepwarm/actions/workflows/release.yml)
+[![pi package](https://img.shields.io/badge/pi-package-7c3aed)](https://pi.dev/packages/pi-keepwarm)
+[![license](https://img.shields.io/npm/l/pi-keepwarm)](LICENSE)
+
 [English](README.md) | 中文
 
 一个 [pi](https://pi.dev) 扩展：在你**空闲时**替长 session 保持 prompt cache 不过期。离开 20–60 分钟后发的第一条消息仍然能直接读缓存，不用全价重写。

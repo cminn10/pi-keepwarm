@@ -1,10 +1,13 @@
-# Manually triggered: CI, then (optionally) bump the version and publish to npm.
+# Manually triggered: CI, then bump the version and publish to npm (or a dry run).
 #
 # Publishing uses npm trusted publishing (OIDC): no npm token is stored in GitHub.
 # One-time setup on npm (package settings -> Trusted Publisher -> GitHub Actions):
-#   owner/repo: cminn10/pi-keepwarm, workflow file: release.yml, environment: (none)
+#   owner/repo: cminn10/pi-keepwarm, workflow file: release.yml
 # or from the CLI (npm >= 11.15, 2FA required):
-#   npx npm@latest trust github pi-keepwarm --file release.yml --repo cminn10/pi-keepwarm --allow-publish
+#   npm trust github pi-keepwarm --file release.yml --repo cminn10/pi-keepwarm --allow-publish
+#
+# The publish job runs in the `npm` environment, so each release shows up under the
+# repository's Deployments with a link to the published version on npmjs.com.
 name: Release
 
 on:
@@ -38,10 +41,36 @@ jobs:
       - run: bun test
       - run: npm pack --dry-run
 
+  dry-run:
+    needs: ci
+    if: inputs.dry_run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Bump version (not committed)
+        if: inputs.bump != 'none'
+        run: npm version "${{ inputs.bump }}" --no-git-tag-version
+      - name: Check the version is not published yet
+        run: |
+          name=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          if npm view "$name@$version" version >/dev/null 2>&1; then
+            echo "::error::$name@$version is already on npm. Choose a bump other than 'none'."
+            exit 1
+          fi
+          echo "Would release $name@$version"
+      - run: npm publish --dry-run
+
   publish:
     needs: ci
-    if: github.ref == 'refs/heads/main'
+    if: ${{ !inputs.dry_run && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
+    environment:
+      name: npm
+      url: ${{ steps.version.outputs.url }}
     permissions:
       contents: write # push the version commit and tag, create the GitHub release
       id-token: write # npm trusted publishing (OIDC)
@@ -66,27 +95,38 @@ jobs:
         run: |
           name=$(node -p "require('./package.json').name")
           version=$(node -p "require('./package.json').version")
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          {
+            echo "name=$name"
+            echo "version=$version"
+            echo "url=https://www.npmjs.com/package/$name/v/$version"
+          } >> "$GITHUB_OUTPUT"
           if npm view "$name@$version" version >/dev/null 2>&1; then
             echo "::error::$name@$version is already on npm. Choose a bump other than 'none'."
             exit 1
           fi
           echo "Releasing $name@$version"
 
-      - name: Publish (dry run)
-        if: inputs.dry_run
-        run: npm publish --dry-run
-
       - name: Push version commit and tag
-        if: ${{ !inputs.dry_run && inputs.bump != 'none' }}
+        if: inputs.bump != 'none'
         run: git push --follow-tags
 
       - name: Publish to npm
-        if: ${{ !inputs.dry_run }}
         run: npm publish --access public
 
+      # npm scans new versions for malware before they become installable (~5-15 min).
+      - name: Wait until the version is on the registry
+        run: |
+          spec="${{ steps.version.outputs.name }}@${{ steps.version.outputs.version }}"
+          for _ in $(seq 1 60); do
+            if npm view "$spec" version --prefer-online >/dev/null 2>&1; then
+              echo "$spec is available"
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "::warning::$spec was accepted but is not visible on the registry after 30 minutes (npm publish-time malware scan still pending or held for review)"
+
       - name: Create GitHub release
-        if: ${{ !inputs.dry_run }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
