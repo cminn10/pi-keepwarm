@@ -1,5 +1,7 @@
 # pi-keepwarm
 
+English | [中文](README.zh-CN.md)
+
 A [pi](https://pi.dev) extension that keeps a long session's prompt cache warm **while you're idle**, so the first message after a 20–60 minute break reads the cache instead of paying for a full cache rewrite.
 
 By default you switch it on per session with `/keepwarm` and off when you're done. With `autoStart` in the config file it turns on in every session.
@@ -14,7 +16,7 @@ Provider prompt caches expire quickly when nothing touches them:
 | OpenAI, GPT-5.6+ | ≥ 30 min |
 | OpenAI, earlier models | `in_memory`: ~5–10 min; `24h` retention where supported |
 
-In a 150k-token Claude session, stepping away for 10 minutes means the next message rewrites the whole prefix at 1.25× input price. Refreshing the cache before it expires only costs a cache read of the prefix (0.1× input, 0.05× on Opus 5.5).
+In a 150k-token Claude session, stepping away for 10 minutes means the next message rewrites the whole prefix at 1.25× base input price. Refreshing the cache before it expires only costs a cache read of the prefix: 0.1× base input on most Claude models, lower on some.
 
 Pi's built-in `cacheWarming` setting refreshes during runs, or for at most 30 minutes after a run with `"idle"`. keepwarm is for longer breaks: you turn it on yourself, and it keeps refreshing until you turn it off or a time or cost limit is reached.
 
@@ -91,13 +93,17 @@ Status bar:
 - Each refresh is recorded as a `keepwarm` custom entry in the session file with its provider usage and cost.
 - A failed refresh is retried after 15s while the cache is still alive. After `maxRetries` consecutive failures keepwarm turns itself off. A refresh that reports a cache write instead of a read counts as a failure, since the replay no longer matches. A successful refresh or a new real request resets the count.
 
-### Cost example (Claude Opus 5.5, 150k-token context)
+### When it pays off
+
+With a context of *P* tokens and base input price *B* on Anthropic's 5-minute cache (a refresh every 4.5 minutes):
 
 | | Cost |
 |---|---|
-| One refresh (cache read) | ~$0.03 |
-| One hour idle with keepwarm (13 refreshes) | ~$0.40 |
-| One cold rewrite of the prefix | ~$0.78 |
+| One refresh (cache read) | *P* × *B* × read multiplier (0.1× on most Claude models) |
+| Idle for *T* minutes with keepwarm | about *T* / 4.5 refreshes |
+| One cold rewrite after the cache expired | *P* × *B* × 1.25 |
+
+Keeping the cache warm is cheaper than one rewrite for breaks up to about **4.5 × 1.25 / read multiplier** minutes: about 55 minutes at 0.1×, about 110 minutes at 0.05×. Past that point, letting the cache expire is cheaper. Use `duration` / `maxCost` to match your typical breaks.
 
 ## Supported APIs
 
@@ -106,7 +112,7 @@ Status bar:
 ## Notes and limits
 
 - Runtime state (on/off, spend, captured request) is per session and in memory. After `/reload` or reopening a session, keepwarm starts fresh: auto-started if `autoStart` is set, otherwise run `/keepwarm` again. It arms on the next message.
-- If another extension rewrites the provider payload after keepwarm captures it, the replay won't match and will be a cache write. keepwarm warns when a refresh reports no cache read ("cache was already cold").
+- If another extension rewrites the provider payload after keepwarm captures it, the replay won't match and will be a cache write. keepwarm reports such refreshes as a cache miss, and they count toward `maxRetries`.
 - Refresh cost is recorded in the session file but not included in pi's own session cost totals.
 - Tested with pi 0.87.1.
 
