@@ -1,0 +1,37 @@
+{
+  "name": "pi-keepwarm",
+  "version": "0.1.0",
+  "description": "Pi extension: manually keep a long session's prompt cache warm while you're idle, so the next message after a long break doesn't pay a full cache rewrite.",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "prompt-caching",
+    "anthropic",
+    "claude",
+    "openai"
+  ],
+  "license": "MIT",
+  "author": "Yezi Zhou <cminn10@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cminn10/pi-keepwarm.git"
+  },
+  "homepage": "https://github.com/cminn10/pi-keepwarm#readme",
+  "bugs": {
+    "url": "https://github.com/cminn10/pi-keepwarm/issues"
+  },
+  "files": [
+    "extensions",
+    "README.md",
+    "LICENSE"
+  ],
+  "pi": {
+    "extensions": [
+      "./extensions/keepwarm.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  }
+}
