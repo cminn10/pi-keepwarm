@@ -2,7 +2,7 @@
 
 A [pi](https://pi.dev) extension that keeps a long session's prompt cache warm **while you're idle**, so the first message after a 20–60 minute break reads the cache instead of paying for a full cache rewrite.
 
-You switch it on per session with `/keepwarm` and switch it off when you're done.
+By default you switch it on per session with `/keepwarm` and off when you're done. With `autoStart` in the config file it turns on in every session.
 
 ## Why
 
@@ -34,16 +34,44 @@ pi install git:github.com/cminn10/pi-keepwarm
 
 | Command | Effect |
 |---|---|
-| `/keepwarm` | Toggle (turns on with a 2h limit) |
-| `/keepwarm on $20` | Cost cap only: no time limit, stops after $20 of refreshes |
-| `/keepwarm on 5h $20` | Stops at whichever limit is hit first |
-| `/keepwarm on forever` | No limits; runs until `/keepwarm off` |
+| `/keepwarm` | Toggle; turning on uses the defaults from the config file |
+| `/keepwarm on 5h $20` | Turn on; given limits override the configured defaults |
+| `/keepwarm on forever` | No time limit (the configured cost cap still applies) |
 | `/keepwarm on 5h` *(while on)* | Change only the time limit (counted from now) |
 | `/keepwarm on $30` *(while on)* | Change only the cost cap; `nocap` removes it |
-| `/keepwarm status` | Show state, TTL, next refresh, refresh count and cost |
+| `/keepwarm status` | Show state, TTL, next refresh, refreshes, cost, failures |
+| `/keepwarm config` | Show the config file path and effective defaults |
 | `/keepwarm off` | Stop |
 
 The cost cap counts all keepwarm spend in the session, including before an off/on.
+
+## Configuration
+
+On first session start keepwarm creates `~/.pi/agent/keepwarm.json` (or the equivalent under `PI_CODING_AGENT_DIR`) with the defaults:
+
+```json
+{
+  "autoStart": false,
+  "duration": "2h",
+  "maxCost": null,
+  "maxRetries": 2
+}
+```
+
+| Key | Meaning |
+|---|---|
+| `autoStart` | `true` turns keepwarm on automatically in every session |
+| `duration` | Default time limit: `"90m"`, `"2h"`, `"forever"` |
+| `maxCost` | Default cost cap in USD for keepwarm spend per session, or `null` for no cap |
+| `maxRetries` | Stop after this many consecutive failed refreshes (errors or cache misses) |
+
+Example: always on, no time limit, at most $10 per session:
+
+```json
+{ "autoStart": true, "duration": "forever", "maxCost": 10, "maxRetries": 2 }
+```
+
+The file is re-read on every session start and every `/keepwarm` / `/keepwarm on`, so edits apply without reloading. Invalid values fall back to the built-in default and are reported. Keys starting with `_` (like the generated `_help`) are ignored.
 
 Status bar:
 
@@ -61,6 +89,7 @@ Status bar:
 - TTL is detected from the payload: `cache_control.ttl: "1h"` on Anthropic, `prompt_cache_retention` / `prompt_cache_options` on OpenAI. A model's `promptCache` lifetimes in `models.json` take precedence.
 - Warming pauses until the next real message on model switch, compaction, `/tree` navigation, or if the refresh timer fires after the cache has already expired (for example after the machine slept). A refresh at that point would be a full-price write.
 - Each refresh is recorded as a `keepwarm` custom entry in the session file with its provider usage and cost.
+- A failed refresh is retried after 15s while the cache is still alive. After `maxRetries` consecutive failures keepwarm turns itself off. A refresh that reports a cache write instead of a read counts as a failure, since the replay no longer matches. A successful refresh or a new real request resets the count.
 
 ### Cost example (Claude Opus 5.5, 150k-token context)
 
@@ -76,14 +105,14 @@ Status bar:
 
 ## Notes and limits
 
-- keepwarm state is per session and in memory. After `/reload` or reopening a session, run `/keepwarm` again. It arms on the next message.
+- Runtime state (on/off, spend, captured request) is per session and in memory. After `/reload` or reopening a session, keepwarm starts fresh: auto-started if `autoStart` is set, otherwise run `/keepwarm` again. It arms on the next message.
 - If another extension rewrites the provider payload after keepwarm captures it, the replay won't match and will be a cache write. keepwarm warns when a refresh reports no cache read ("cache was already cold").
 - Refresh cost is recorded in the session file but not included in pi's own session cost totals.
 - Tested with pi 0.87.1.
 
 ### Testing overrides
 
-`PI_KEEPWARM_EVERY_SEC` forces the refresh interval. `PI_KEEPWARM_TTL_SEC` forces the assumed TTL.
+`PI_KEEPWARM_EVERY_SEC` forces the refresh interval. `PI_KEEPWARM_TTL_SEC` forces the assumed TTL. `PI_KEEPWARM_TEST_FAIL=1` makes refreshes fail (invalid `max_tokens`) to exercise retry handling.
 
 ## License
 

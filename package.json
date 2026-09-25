@@ -28,7 +28,7 @@
   ],
   "pi": {
     "extensions": [
-      "./extensions/keepwarm.ts"
+      "./extensions/keepwarm/index.ts"
     ]
   },
   "peerDependencies": {
