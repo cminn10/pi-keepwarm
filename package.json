@@ -1,6 +1,6 @@
 {
   "name": "pi-keepwarm",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Pi extension: manually keep a long session's prompt cache warm while you're idle, so the next message after a long break doesn't pay a full cache rewrite.",
   "keywords": [
     "pi-package",
