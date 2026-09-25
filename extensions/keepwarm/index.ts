@@ -203,9 +203,10 @@ export default function keepwarm(pi: ExtensionAPI) {
 			schedule();
 			return;
 		}
-		const retryAt = Date.now() + RETRY_DELAY_MS;
+		const retryDelay = Math.min(RETRY_DELAY_MS, refreshDelayMs(last.ttlMs) / 2);
+		const retryAt = Date.now() + retryDelay;
 		if (retryAt < s.lastTouch + last.ttlMs - 5_000) {
-			notify(`refresh failed (${s.failures}/${s.maxRetries}): ${why}; retrying in ${fmtDur(RETRY_DELAY_MS)}`, "warning");
+			notify(`refresh failed (${s.failures}/${s.maxRetries}): ${why}; retrying in ${fmtDur(retryDelay)}`, "warning");
 			armAt(retryAt);
 		} else {
 			notify(`refresh failed (${s.failures}/${s.maxRetries}): ${why}; cache will expire, re-arms on next message`, "warning");

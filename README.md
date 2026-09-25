@@ -120,6 +120,16 @@ Keeping the cache warm is cheaper than one rewrite for breaks up to about **4.5 
 
 `PI_KEEPWARM_EVERY_SEC` forces the refresh interval. `PI_KEEPWARM_TTL_SEC` forces the assumed TTL. `PI_KEEPWARM_TEST_FAIL=1` makes refreshes fail (invalid `max_tokens`) to exercise retry handling.
 
+## Development
+
+```bash
+bun install
+bun run check      # typecheck + tests + npm pack --dry-run
+pi install .       # load your working copy in pi
+```
+
+Releases are cut by the manual **Release** GitHub Actions workflow (Actions → Release → Run workflow). It runs CI, bumps the version (`patch` / `minor` / `major`, or `none`), pushes the commit and tag, publishes to npm via trusted publishing (OIDC, with provenance), and creates a GitHub release. Tick *dry run* to only run CI and `npm publish --dry-run`.
+
 ## License
 
 MIT

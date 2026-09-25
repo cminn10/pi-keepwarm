@@ -120,6 +120,16 @@ pi install git:github.com/cminn10/pi-keepwarm
 
 `PI_KEEPWARM_EVERY_SEC` 强制指定刷新间隔。`PI_KEEPWARM_TTL_SEC` 强制指定 TTL。`PI_KEEPWARM_TEST_FAIL=1` 让刷新请求失败（非法的 `max_tokens`），用来测试重试逻辑。
 
+## 开发
+
+```bash
+bun install
+bun run check      # 类型检查 + 测试 + npm pack --dry-run
+pi install .       # 在 pi 中加载本地工作副本
+```
+
+发布通过手动触发的 GitHub Actions **Release** workflow 完成（Actions → Release → Run workflow）。它会依次执行：跑 CI、升版本号（`patch` / `minor` / `major`，或 `none`）、推送版本提交和 tag、通过 npm trusted publishing 发布（OIDC，附带 provenance）、创建 GitHub Release。勾选 *dry run* 时只跑 CI 和 `npm publish --dry-run`。
+
 ## 许可证
 
 MIT

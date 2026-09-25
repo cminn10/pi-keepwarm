@@ -1,0 +1,98 @@
+# Manually triggered: CI, then (optionally) bump the version and publish to npm.
+#
+# Publishing uses npm trusted publishing (OIDC): no npm token is stored in GitHub.
+# One-time setup on npm (package settings -> Trusted Publisher -> GitHub Actions):
+#   owner/repo: cminn10/pi-keepwarm, workflow file: release.yml, environment: (none)
+# or from the CLI (npm >= 11.15, 2FA required):
+#   npx npm@latest trust github pi-keepwarm --file release.yml --repo cminn10/pi-keepwarm --allow-publish
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump (none = publish the version already in package.json)"
+        type: choice
+        options: [patch, minor, major, none]
+        default: patch
+      dry_run:
+        description: "Dry run: CI + npm publish --dry-run, no commit, tag, or publish"
+        type: boolean
+        default: false
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      - run: bun test
+      - run: npm pack --dry-run
+
+  publish:
+    needs: ci
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the version commit and tag, create the GitHub release
+      id-token: write # npm trusted publishing (OIDC)
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Use an npm with trusted publishing (>= 11.5.1)
+        run: npm install -g npm@latest && npm --version
+
+      - name: Bump version
+        if: inputs.bump != 'none'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          npm version "${{ inputs.bump }}" -m "Release v%s"
+
+      - name: Check the version is not published yet
+        id: version
+        run: |
+          name=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if npm view "$name@$version" version >/dev/null 2>&1; then
+            echo "::error::$name@$version is already on npm. Choose a bump other than 'none'."
+            exit 1
+          fi
+          echo "Releasing $name@$version"
+
+      - name: Publish (dry run)
+        if: inputs.dry_run
+        run: npm publish --dry-run
+
+      - name: Push version commit and tag
+        if: ${{ !inputs.dry_run && inputs.bump != 'none' }}
+        run: git push --follow-tags
+
+      - name: Publish to npm
+        if: ${{ !inputs.dry_run }}
+        run: npm publish --access public
+
+      - name: Create GitHub release
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v${{ steps.version.outputs.version }}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists"
+          else
+            gh release create "$tag" --target "$(git rev-parse HEAD)" --generate-notes
+          fi
